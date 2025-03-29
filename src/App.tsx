@@ -492,16 +492,6 @@ function App() {
     setShownItems(prev => [...prev, newItem])
   }
   
-  const [currentQuestion, setCurrentQuestion] = useState({
-    text: "Prolly.is time to choose a category",
-    options: [
-      { text: "Food", action: () => handleCategorySelect("Food") },
-      { text: "Sports", action: () => handleCategorySelect("Sports") },
-      { text: "Movies", action: () => handleCategorySelect("Movies") },
-      { text: "Music", action: () => handleCategorySelect("Music") }
-    ]
-  })
-
   const getQuestionText = () => {
     if (isGameComplete) {
       return selectedGame?.question
@@ -512,7 +502,7 @@ function App() {
     if (selectedCategory) {
       return `Let's play ${selectedGames.map(g => g.label).join(' or ')}!`
     }
-    return currentQuestion.text
+    return "Prolly.is time to choose a category"
   }
 
   const handlePlayAgain = () => {
@@ -597,7 +587,12 @@ function App() {
                 </Button>
               ))
             ) : (
-              currentQuestion.options.map((option, index) => (
+              [
+                { text: "Food", action: () => handleCategorySelect("Food") },
+                { text: "Sports", action: () => handleCategorySelect("Sports") },
+                { text: "Movies", action: () => handleCategorySelect("Movies") },
+                { text: "Music", action: () => handleCategorySelect("Music") }
+              ].map((option, index) => (
                 <Button 
                   key={index} 
                   onClick={option.action}
