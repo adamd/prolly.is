@@ -18,6 +18,14 @@ export type GameState = {
     width: number
     height: number
   }
+  currentStreak: {
+    item: string
+    count: number
+  }
+  longestStreak: {
+    item: string
+    count: number
+  }
 }
 
 export type GameAction =

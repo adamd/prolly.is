@@ -4,6 +4,7 @@ import ReactConfetti from 'react-confetti'
 import type { Game as GameType, GameState, GameAction, Category } from '../types/game'
 import { gamesByCategory } from '../data/games'
 import { getRandomGames, getRandomItems } from '../utils/random'
+import { useStreak } from '../context/StreakContext'
 import {
   Container,
   QuestionCard,
@@ -13,8 +14,10 @@ import {
   CompletionMessage,
   CompletionButtonContainer,
   CompletionButton,
-  ConfettiContainer
+  ConfettiContainer,
+  ReloadButton
 } from '../styles/components'
+import styled from 'styled-components'
 
 const DEBUG = false // Set to true to enable logging
 
@@ -29,6 +32,14 @@ const initialState: GameState = {
   windowSize: {
     width: window.innerWidth,
     height: window.innerHeight,
+  },
+  currentStreak: {
+    item: '',
+    count: 0
+  },
+  longestStreak: {
+    item: '',
+    count: 0
   }
 }
 
@@ -67,7 +78,9 @@ const loadInitialState = (): GameState => {
           currentItems: parsed.currentItems || [],
           selectedItems: parsed.selectedItems || [],
           shownItems: parsed.shownItems || [],
-          isGameComplete: parsed.isGameComplete || false
+          isGameComplete: parsed.isGameComplete || false,
+          currentStreak: parsed.currentStreak || { item: '', count: 0 },
+          longestStreak: parsed.longestStreak || { item: '', count: 0 }
         }
       }
     } catch (e) {
@@ -86,7 +99,9 @@ const saveGameState = (state: GameState) => {
     currentItems: state.currentItems,
     selectedItems: state.selectedItems,
     shownItems: state.shownItems,
-    isGameComplete: state.isGameComplete
+    isGameComplete: state.isGameComplete,
+    currentStreak: state.currentStreak,
+    longestStreak: state.longestStreak
   }
   localStorage.setItem(STORAGE_KEY, JSON.stringify(essentialState))
 }
@@ -104,7 +119,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         currentItems: [],
         selectedItems: [],
         shownItems: [],
-        isGameComplete: false
+        isGameComplete: false,
+        currentStreak: {
+          item: '',
+          count: 0
+        },
+        longestStreak: {
+          item: '',
+          count: 0
+        }
       }
     }
     case 'SELECT_GAME': {
@@ -115,23 +138,48 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         currentItems: action.initialItems,
         shownItems: action.initialItems,
         selectedItems: [],
-        isGameComplete: false
+        isGameComplete: false,
+        currentStreak: {
+          item: '',
+          count: 0
+        },
+        longestStreak: {
+          item: '',
+          count: 0
+        }
       }
     }
     case 'SELECT_ITEM': {
       DEBUG && console.log('SELECT_ITEM case')
+      const newCurrentStreak = state.currentStreak.item === action.item
+        ? { item: action.item, count: state.currentStreak.count + 1 }
+        : { item: action.item, count: 1 }
+
+      const newLongestStreak = newCurrentStreak.count > state.longestStreak.count
+        ? newCurrentStreak
+        : state.longestStreak
+
+      DEBUG && console.log('Streak Update:', {
+        currentStreak: newCurrentStreak,
+        longestStreak: newLongestStreak
+      })
+
       if (!action.newItem) {
         return {
           ...state,
           selectedItems: [...state.selectedItems, action.item],
-          isGameComplete: true
+          isGameComplete: true,
+          currentStreak: newCurrentStreak,
+          longestStreak: newLongestStreak
         }
       }
       return {
         ...state,
         selectedItems: [...state.selectedItems, action.item],
         currentItems: [action.item, action.newItem],
-        shownItems: [...state.shownItems, action.newItem]
+        shownItems: [...state.shownItems, action.newItem],
+        currentStreak: newCurrentStreak,
+        longestStreak: newLongestStreak
       }
     }
     case 'PLAY_AGAIN':
@@ -142,7 +190,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         selectedItems: [],
         shownItems: newItems,
         isGameComplete: false,
-        currentItems: newItems
+        currentItems: newItems,
+        currentStreak: {
+          item: '',
+          count: 0
+        },
+        longestStreak: {
+          item: '',
+          count: 0
+        }
       }
     case 'NEW_CATEGORY_GAME':
       console.log('NEW_CATEGORY_GAME case')
@@ -152,7 +208,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         currentItems: [],
         selectedItems: [],
         shownItems: [],
-        isGameComplete: false
+        isGameComplete: false,
+        currentStreak: {
+          item: '',
+          count: 0
+        },
+        longestStreak: {
+          item: '',
+          count: 0
+        }
       }
     case 'START_OVER':
       console.log('START_OVER case')
@@ -173,11 +237,13 @@ export function Game() {
   const { category, game } = useParams()
   const [state, dispatch] = useReducer(gameReducer, loadInitialState())
   const lastUrlRef = useRef<string>('')
+  const { setCurrentStreak } = useStreak()
 
   // Save state to localStorage whenever it changes
   useEffect(() => {
     saveGameState(state)
-  }, [state])
+    setCurrentStreak(state.currentStreak)
+  }, [state, setCurrentStreak])
 
   useEffect(() => {
     const handleResize = () => {
@@ -323,6 +389,34 @@ export function Game() {
     return "Prolly.is time to choose a category"
   }
 
+  const handleReloadGames = () => {
+    if (!state.selectedCategory) return
+    const currentGames = state.selectedGames.map(g => g.label)
+    const allGames = gamesByCategory[state.selectedCategory]
+    const availableGames = allGames.filter(g => !currentGames.includes(g.label))
+    
+    if (availableGames.length < 2) {
+      // If we don't have enough games to exclude, just get random ones
+      const newGames = getRandomGames(state.selectedCategory, 2)
+      dispatch({
+        type: 'SELECT_CATEGORY',
+        category: state.selectedCategory,
+        selectedGames: newGames
+      })
+      return
+    }
+
+    // Get two random games from the available ones
+    const shuffled = [...availableGames].sort(() => Math.random() - 0.5)
+    const newGames = shuffled.slice(0, 2)
+    
+    dispatch({
+      type: 'SELECT_CATEGORY',
+      category: state.selectedCategory,
+      selectedGames: newGames
+    })
+  }
+
   return (
     <Container>
       {state.isGameComplete && (
@@ -341,73 +435,95 @@ export function Game() {
         </ConfettiContainer>
       )}
       <QuestionCard>
-        <Question>{getQuestionText()}</Question>
-        {state.isGameComplete ? (
-          <>
-            <Button 
-              style={{
-                backgroundColor: '#28a745',
-                fontSize: '1.5rem',
-                padding: '1.5rem 3rem'
-              }}
-            >
-              Is it {state.selectedItems[state.selectedItems.length - 1]}?
-            </Button>
-            <CompletionMessage>Prolly.is!</CompletionMessage>
-            <CompletionButtonContainer>
-              <CompletionButton onClick={handlePlayAgain}>
-                Play Again
-              </CompletionButton>
-              <CompletionButton onClick={handleNewCategoryGame}>
-                New {state.selectedCategory}
-              </CompletionButton>
-              <CompletionButton onClick={handleStartOver}>
-                Start Over
-              </CompletionButton>
-            </CompletionButtonContainer>
-          </>
-        ) : (
-          <ButtonContainer>
-            {state.selectedGame ? (
-              state.currentItems.map((item, index) => (
-                <Button 
-                  key={index}
-                  onClick={() => handleItemSelect(item)}
-                  style={{
-                    backgroundColor: '#28a745'
-                  }}
-                >
-                  {item}
-                </Button>
-              ))
-            ) : state.selectedCategory ? (
-              state.selectedGames.map((game, index) => (
-                <Button 
-                  key={index}
-                  onClick={() => handleGameSelect(game)}
-                  style={{
-                    backgroundColor: '#28a745'
-                  }}
-                >
-                  {game.label}
-                </Button>
-              ))
-            ) : (
-              Object.keys(gamesByCategory)
-                .filter(cat => cat !== 'Test')
-                .map((category, index) => (
-                  <Button 
-                    key={index} 
-                    onClick={() => handleCategorySelect(category as Category)}
-                    style={{
-                      backgroundColor: state.selectedCategory === category ? '#0056b3' : '#007bff'
+        {state.selectedGame ? (
+          state.isGameComplete ? (
+            <>
+              <Question>{state.selectedGame.question}</Question>
+              <Button 
+                style={{
+                  backgroundColor: '#28a745',
+                  fontSize: '1.5rem',
+                  padding: '1.5rem 3rem'
+                }}
+              >
+                Is it {state.selectedItems[state.selectedItems.length - 1]}?
+              </Button>
+              <CompletionMessage>Prolly.is!</CompletionMessage>
+              <CompletionButtonContainer>
+                <CompletionButton onClick={handlePlayAgain}>
+                  Play Again
+                </CompletionButton>
+                <CompletionButton onClick={handleNewCategoryGame}>
+                  New {state.selectedCategory}
+                </CompletionButton>
+                <CompletionButton onClick={handleStartOver}>
+                  Start Over
+                </CompletionButton>
+              </CompletionButtonContainer>
+            </>
+          ) : (
+            <>
+              <Question>{state.selectedGame.question}</Question>
+              <ButtonContainer>
+                {state.currentItems.map((item) => (
+                  <Button
+                    key={item}
+                    onClick={() => {
+                      const remainingItems = state.selectedGame!.items.filter(
+                        (i) => !state.shownItems.includes(i)
+                      )
+                      const newItem = getRandomItems(remainingItems, 1, [], DEBUG)[0]
+                      dispatch({
+                        type: 'SELECT_ITEM',
+                        item,
+                        newItem,
+                      })
                     }}
                   >
-                    {category}
+                    {item}
                   </Button>
-                ))
-            )}
-          </ButtonContainer>
+                ))}
+              </ButtonContainer>
+            </>
+          )
+        ) : (
+          <>
+            <Question>{getQuestionText()}</Question>
+            <ButtonContainer>
+              {state.selectedCategory ? (
+                <>
+                  {state.selectedGames.map((game, index) => (
+                    <Button 
+                      key={index}
+                      onClick={() => handleGameSelect(game)}
+                      style={{
+                        backgroundColor: '#28a745'
+                      }}
+                    >
+                      {game.label}
+                    </Button>
+                  ))}
+                  <ReloadButton onClick={handleReloadGames}>
+                    🔄 New Options
+                  </ReloadButton>
+                </>
+              ) : (
+                Object.keys(gamesByCategory)
+                  .filter(cat => cat !== 'Test')
+                  .map((category, index) => (
+                    <Button 
+                      key={index} 
+                      onClick={() => handleCategorySelect(category as Category)}
+                      style={{
+                        backgroundColor: state.selectedCategory === category ? '#0056b3' : '#007bff'
+                      }}
+                    >
+                      {category}
+                    </Button>
+                  ))
+              )}
+            </ButtonContainer>
+          </>
         )}
       </QuestionCard>
     </Container>

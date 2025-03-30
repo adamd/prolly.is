@@ -89,4 +89,16 @@ export const ConfettiContainer = styled.div`
   height: 100%;
   pointer-events: none;
   z-index: 1000;
+`
+
+export const ReloadButton = styled(Button)`
+  background-color: #6c757d;
+  margin-top: 1rem;
+  font-size: 1.2rem;
+  padding: 0.75rem 1.5rem;
+  max-width: 200px;
+
+  &:hover {
+    background-color: #5a6268;
+  }
 ` 
