@@ -1,5 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import styled from 'styled-components'
+import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom'
+import ReactConfetti from 'react-confetti'
 
 const Container = styled.div`
   min-height: 100vh;
@@ -76,6 +78,16 @@ const CompletionButton = styled(Button)`
   &:hover {
     background-color: #5a6268;
   }
+`
+
+const ConfettiContainer = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1000;
 `
 
 interface Game {
@@ -435,6 +447,13 @@ const gamesByCategory: Record<string, Game[]> = {
         "911"
       ]
     }
+  ],
+  Test: [
+    {
+      label: "Test",
+      question: "Which test item is your favorite?",
+      items: ["A", "B", "C"]
+    }
   ]
 }
 
@@ -451,7 +470,9 @@ function getRandomItems(items: string[], count: number = 2, exclude: string[] = 
   return shuffled.slice(0, count)
 }
 
-function App() {
+function GameComponent() {
+  const navigate = useNavigate()
+  const { category, game } = useParams()
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
   const [selectedGames, setSelectedGames] = useState<Game[]>([])
   const [selectedGame, setSelectedGame] = useState<Game | null>(null)
@@ -459,6 +480,77 @@ function App() {
   const [selectedItems, setSelectedItems] = useState<string[]>([])
   const [shownItems, setShownItems] = useState<string[]>([])
   const [isGameComplete, setIsGameComplete] = useState(false)
+  const [windowSize, setWindowSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight,
+  })
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight,
+      })
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
+  useEffect(() => {
+    console.log('Route params:', { category, game }) // Debug log
+    console.log('Available categories:', Object.keys(gamesByCategory)) // Debug log
+
+    // Reset state when route changes
+    setSelectedItems([])
+    setShownItems([])
+    setIsGameComplete(false)
+
+    // Regular category/game handling
+    if (category && game) {
+      console.log('Loading regular game:', { category, game }) // Debug log
+      // Find the correct category case
+      const correctCategory = Object.keys(gamesByCategory).find(
+        cat => cat.toLowerCase() === category.toLowerCase()
+      )
+      
+      if (correctCategory) {
+        const categoryGames = gamesByCategory[correctCategory]
+        const targetGame = categoryGames.find(g => 
+          g.label.toLowerCase().replace(/\s+/g, '-') === game.toLowerCase()
+        )
+        if (targetGame) {
+          setSelectedCategory(correctCategory)
+          setSelectedGame(targetGame)
+          const initialItems = getRandomItems(targetGame.items)
+          setCurrentItems(initialItems)
+          setShownItems(initialItems)
+        }
+      }
+    } else if (category) {
+      // Handle category-only route
+      console.log('Loading category:', category) // Debug log
+      // Find the correct category case
+      const correctCategory = Object.keys(gamesByCategory).find(
+        cat => cat.toLowerCase() === category.toLowerCase()
+      )
+      
+      if (correctCategory) {
+        setSelectedCategory(correctCategory)
+        setSelectedGames(getRandomGames(correctCategory))
+        setSelectedGame(null)
+      }
+    } else {
+      // Reset to initial state for home route
+      setSelectedCategory(null)
+      setSelectedGames([])
+      setSelectedGame(null)
+      setCurrentItems([])
+      setSelectedItems([])
+      setShownItems([])
+      setIsGameComplete(false)
+    }
+  }, [category, game])
   
   const handleCategorySelect = (category: string) => {
     setSelectedCategory(category)
@@ -468,6 +560,7 @@ function App() {
     setSelectedItems([])
     setShownItems([])
     setIsGameComplete(false)
+    navigate(`/${category.toLowerCase()}`)
   }
 
   const handleGameSelect = (game: Game) => {
@@ -476,6 +569,7 @@ function App() {
     setCurrentItems(initialItems)
     setShownItems(initialItems)
     setIsGameComplete(false)
+    navigate(`/${selectedCategory?.toLowerCase()}/${game.label.toLowerCase().replace(/\s+/g, '-')}`)
   }
 
   const handleItemSelect = (item: string) => {
@@ -520,6 +614,7 @@ function App() {
     setSelectedItems([])
     setShownItems([])
     setIsGameComplete(false)
+    navigate(`/${selectedCategory?.toLowerCase()}`)
   }
 
   const handleStartOver = () => {
@@ -530,10 +625,26 @@ function App() {
     setSelectedItems([])
     setShownItems([])
     setIsGameComplete(false)
+    navigate('/')
   }
 
   return (
     <Container>
+      {isGameComplete && (
+        <ConfettiContainer>
+          <ReactConfetti
+            width={windowSize.width}
+            height={windowSize.height}
+            recycle={false}
+            numberOfPieces={200}
+            gravity={0.3}
+            colors={['#28a745', '#007bff', '#ffc107', '#dc3545', '#6c757d']}
+            onConfettiComplete={() => {
+              // Optional: Add any cleanup or additional actions here
+            }}
+          />
+        </ConfettiContainer>
+      )}
       <QuestionCard>
         <Question>{getQuestionText()}</Question>
         {isGameComplete ? (
@@ -587,27 +698,37 @@ function App() {
                 </Button>
               ))
             ) : (
-              [
-                { text: "Food", action: () => handleCategorySelect("Food") },
-                { text: "Sports", action: () => handleCategorySelect("Sports") },
-                { text: "Movies", action: () => handleCategorySelect("Movies") },
-                { text: "Music", action: () => handleCategorySelect("Music") }
-              ].map((option, index) => (
-                <Button 
-                  key={index} 
-                  onClick={option.action}
-                  style={{
-                    backgroundColor: selectedCategory === option.text ? '#0056b3' : '#007bff'
-                  }}
-                >
-                  {option.text}
-                </Button>
-              ))
+              // Only show non-test categories in the menu
+              Object.keys(gamesByCategory)
+                .filter(cat => cat !== 'Test')
+                .map((category, index) => (
+                  <Button 
+                    key={index} 
+                    onClick={() => handleCategorySelect(category)}
+                    style={{
+                      backgroundColor: selectedCategory === category ? '#0056b3' : '#007bff'
+                    }}
+                  >
+                    {category}
+                  </Button>
+                ))
             )}
           </ButtonContainer>
         )}
       </QuestionCard>
     </Container>
+  )
+}
+
+function App() {
+  return (
+    <Router>
+      <Routes>
+        <Route path="/" element={<GameComponent />} />
+        <Route path="/:category" element={<GameComponent />} />
+        <Route path="/:category/:game" element={<GameComponent />} />
+      </Routes>
+    </Router>
   )
 }
 
