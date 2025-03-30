@@ -23,7 +23,7 @@ export type GameState = {
 export type GameAction =
   | { type: 'SELECT_CATEGORY'; category: string; selectedGames: Game[] }
   | { type: 'SELECT_GAME'; game: Game; initialItems: string[] }
-  | { type: 'SELECT_ITEM'; item: string }
+  | { type: 'SELECT_ITEM'; item: string; newItem?: string }
   | { type: 'PLAY_AGAIN' }
   | { type: 'NEW_CATEGORY_GAME' }
   | { type: 'START_OVER' }

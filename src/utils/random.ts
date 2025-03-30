@@ -9,18 +9,26 @@ export function getRandomGames(category: string, count: number = 2): Game[] {
   return shuffled.slice(0, count)
 }
 
-export function getRandomItems(items: string[], count: number = 2, exclude: string[] = []): string[] {
+export function getRandomItems(items: string[], count: number = 2, exclude: string[] = [], debug: boolean = false): string[] {
   const availableItems = items.filter(item => !exclude.includes(item))
-  if (availableItems.length === 0) return []
-  const shuffled = [...availableItems].sort(() => Math.random() - 0.5)
-  const result = shuffled.slice(0, count)
-  console.log('getRandomItems called from:', new Error().stack?.split('\n')[2])
-  console.log('getRandomItems:', {
+  const result: string[] = []
+  const usedIndices = new Set<number>()
+
+  while (result.length < count && result.length < availableItems.length) {
+    const randomIndex = Math.floor(Math.random() * availableItems.length)
+    if (!usedIndices.has(randomIndex)) {
+      usedIndices.add(randomIndex)
+      result.push(availableItems[randomIndex])
+    }
+  }
+
+  debug && console.log('getRandomItems:', {
     input: items,
     count,
     exclude,
     result,
-    hasDuplicates: new Set(result).size !== result.length
+    hasDuplicates: result.length !== new Set(result).size
   })
+
   return result
 } 

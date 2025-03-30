@@ -16,6 +16,8 @@ import {
   ConfettiContainer
 } from '../styles/components'
 
+const DEBUG = false // Set to true to enable logging
+
 const initialState: GameState = {
   selectedCategory: null,
   selectedGames: [],
@@ -30,11 +32,70 @@ const initialState: GameState = {
   }
 }
 
+const STORAGE_KEY = 'prolly-game-state'
+
+// Load initial state from localStorage if available
+const loadInitialState = (): GameState => {
+  // Get current URL from window.location
+  const path = window.location.pathname
+  const savedState = localStorage.getItem(STORAGE_KEY)
+  
+  if (savedState) {
+    try {
+      const parsed = JSON.parse(savedState)
+      const [_, currentCategory, currentGame] = path.split('/')
+      const savedCategory = parsed.selectedCategory?.toLowerCase()
+      const savedGame = parsed.selectedGame?.label.toLowerCase().replace(/\s+/g, '-')
+      
+      // Clear localStorage if we're on a different category or game
+      if (currentCategory && savedCategory && currentCategory !== savedCategory) {
+        localStorage.removeItem(STORAGE_KEY)
+        return initialState
+      }
+      
+      // Only load saved state if we're on the same category and game
+      if (currentCategory === savedCategory && (!currentGame || currentGame === savedGame)) {
+        return {
+          ...initialState,
+          windowSize: {
+            width: window.innerWidth,
+            height: window.innerHeight,
+          },
+          selectedCategory: parsed.selectedCategory || null,
+          selectedGames: parsed.selectedGames || [],
+          selectedGame: parsed.selectedGame || null,
+          currentItems: parsed.currentItems || [],
+          selectedItems: parsed.selectedItems || [],
+          shownItems: parsed.shownItems || [],
+          isGameComplete: parsed.isGameComplete || false
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load saved state:', e)
+    }
+  }
+  return initialState
+}
+
+// Save only essential game state
+const saveGameState = (state: GameState) => {
+  const essentialState = {
+    selectedCategory: state.selectedCategory,
+    selectedGames: state.selectedGames,
+    selectedGame: state.selectedGame,
+    currentItems: state.currentItems,
+    selectedItems: state.selectedItems,
+    shownItems: state.shownItems,
+    isGameComplete: state.isGameComplete
+  }
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(essentialState))
+}
+
 function gameReducer(state: GameState, action: GameAction): GameState {
-  console.log('Reducer action:', action.type)
+  DEBUG && console.log('Reducer action:', action.type)
   switch (action.type) {
     case 'SELECT_CATEGORY': {
-      console.log('SELECT_CATEGORY case')
+      DEBUG && console.log('SELECT_CATEGORY case')
       return {
         ...state,
         selectedCategory: action.category,
@@ -47,7 +108,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
       }
     }
     case 'SELECT_GAME': {
-      console.log('SELECT_GAME case')
+      DEBUG && console.log('SELECT_GAME case')
       return {
         ...state,
         selectedGame: action.game,
@@ -57,23 +118,22 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         isGameComplete: false
       }
     }
-    case 'SELECT_ITEM':
-      console.log('SELECT_ITEM case')
-      const remainingItems = state.selectedGame!.items.filter(i => !state.shownItems.includes(i))
-      if (remainingItems.length === 0) {
+    case 'SELECT_ITEM': {
+      DEBUG && console.log('SELECT_ITEM case')
+      if (!action.newItem) {
         return {
           ...state,
           selectedItems: [...state.selectedItems, action.item],
           isGameComplete: true
         }
       }
-      const newItem = getRandomItems(state.selectedGame!.items, 1, [...state.shownItems])[0]
       return {
         ...state,
         selectedItems: [...state.selectedItems, action.item],
-        currentItems: [action.item, newItem],
-        shownItems: [...state.shownItems, newItem]
+        currentItems: [action.item, action.newItem],
+        shownItems: [...state.shownItems, action.newItem]
       }
+    }
     case 'PLAY_AGAIN':
       console.log('PLAY_AGAIN case')
       const newItems = getRandomItems(state.selectedGame!.items)
@@ -111,8 +171,13 @@ function gameReducer(state: GameState, action: GameAction): GameState {
 export function Game() {
   const navigate = useNavigate()
   const { category, game } = useParams()
-  const [state, dispatch] = useReducer(gameReducer, initialState)
+  const [state, dispatch] = useReducer(gameReducer, loadInitialState())
   const lastUrlRef = useRef<string>('')
+
+  // Save state to localStorage whenever it changes
+  useEffect(() => {
+    saveGameState(state)
+  }, [state])
 
   useEffect(() => {
     const handleResize = () => {
@@ -130,14 +195,27 @@ export function Game() {
   }, [])
 
   useEffect(() => {
-    if (!category) return
+    if (!category) {
+      // Clear localStorage when navigating to home page
+      localStorage.removeItem(STORAGE_KEY)
+      return
+    }
 
     const currentUrl = `${category}-${game || ''}`
     if (currentUrl === lastUrlRef.current) {
-      console.log('Skipping effect for same URL')
+      DEBUG && console.log('Skipping effect for same URL')
       return
     }
     lastUrlRef.current = currentUrl
+
+    // Clear localStorage when navigating to a new category
+    const savedState = localStorage.getItem(STORAGE_KEY)
+    if (savedState) {
+      const parsed = JSON.parse(savedState)
+      if (parsed.selectedCategory?.toLowerCase() !== category.toLowerCase()) {
+        localStorage.removeItem(STORAGE_KEY)
+      }
+    }
 
     const correctCategory = Object.keys(gamesByCategory).find(
       cat => cat.toLowerCase() === category.toLowerCase()
@@ -152,7 +230,25 @@ export function Game() {
         g.label.toLowerCase().replace(/\s+/g, '-') === game.toLowerCase()
       )
       if (targetGame) {
-        const initialItems = getRandomItems(targetGame.items)
+        // Only get new random items if we don't have saved state
+        const savedState = localStorage.getItem(STORAGE_KEY)
+        let initialItems: string[]
+        
+        if (savedState) {
+          const parsed = JSON.parse(savedState)
+          if (parsed.selectedGame?.label === targetGame.label) {
+            // If we have saved state for this game, use its current items
+            initialItems = parsed.currentItems
+          } else {
+            // If saved state is for a different game, get new items
+            initialItems = getRandomItems(targetGame.items, 2, [], DEBUG)
+          }
+        } else {
+          // No saved state, get new items
+          initialItems = getRandomItems(targetGame.items, 2, [], DEBUG)
+        }
+        
+        DEBUG && console.log('Dispatching SELECT_GAME for:', targetGame.label)
         dispatch({ 
           type: 'SELECT_GAME', 
           game: targetGame,
@@ -160,7 +256,13 @@ export function Game() {
         })
       }
     } else {
-      const selectedGames = getRandomGames(correctCategory)
+      // Only get new random games if we don't have saved state
+      const savedState = localStorage.getItem(STORAGE_KEY)
+      const selectedGames = savedState 
+        ? JSON.parse(savedState).selectedGames
+        : getRandomGames(correctCategory)
+      
+      DEBUG && console.log('Dispatching SELECT_CATEGORY for:', correctCategory)
       dispatch({ 
         type: 'SELECT_CATEGORY', 
         category: correctCategory,
@@ -178,19 +280,31 @@ export function Game() {
   }
 
   const handleItemSelect = (item: string) => {
-    dispatch({ type: 'SELECT_ITEM', item })
+    if (state.shownItems.length === state.selectedGame!.items.length - 2) {
+      dispatch({ type: 'SELECT_ITEM', item })
+      return
+    }
+    const newItem = getRandomItems(state.selectedGame!.items, 1, state.shownItems, DEBUG)[0]
+    dispatch({ 
+      type: 'SELECT_ITEM', 
+      item,
+      newItem 
+    })
   }
 
   const handlePlayAgain = () => {
+    localStorage.removeItem(STORAGE_KEY)
     dispatch({ type: 'PLAY_AGAIN' })
   }
 
   const handleNewCategoryGame = () => {
+    localStorage.removeItem(STORAGE_KEY)
     dispatch({ type: 'NEW_CATEGORY_GAME' })
     navigate(`/${state.selectedCategory?.toLowerCase()}`)
   }
 
   const handleStartOver = () => {
+    localStorage.removeItem(STORAGE_KEY)
     dispatch({ type: 'START_OVER' })
     navigate('/')
   }
@@ -203,7 +317,7 @@ export function Game() {
       return state.selectedGame.question
     }
     if (state.selectedCategory) {
-      return `Let's play ${state.selectedGames.map(g => g.label).join(' or ')}!`
+      return `Choose a ${state.selectedCategory} option`
     }
     return "Prolly.is time to choose a category"
   }
