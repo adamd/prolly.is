@@ -28,6 +28,8 @@ const initialState: GameState = {
   selectedItems: [],
   shownItems: [],
   isGameComplete: false,
+  isFinalComparison: false,
+  hasHadFinalShowdown: false,
   windowSize: {
     width: window.innerWidth,
     height: window.innerHeight,
@@ -78,6 +80,8 @@ const loadInitialState = (): GameState => {
           selectedItems: parsed.selectedItems || [],
           shownItems: parsed.shownItems || [],
           isGameComplete: parsed.isGameComplete || false,
+          isFinalComparison: parsed.isFinalComparison || false,
+          hasHadFinalShowdown: parsed.hasHadFinalShowdown || false,
           currentStreak: parsed.currentStreak || { item: '', count: 0 },
           longestStreak: parsed.longestStreak || { item: '', count: 0 }
         }
@@ -99,6 +103,8 @@ const saveGameState = (state: GameState) => {
     selectedItems: state.selectedItems,
     shownItems: state.shownItems,
     isGameComplete: state.isGameComplete,
+    isFinalComparison: state.isFinalComparison,
+    hasHadFinalShowdown: state.hasHadFinalShowdown,
     currentStreak: state.currentStreak,
     longestStreak: state.longestStreak
   }
@@ -119,6 +125,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         selectedItems: [],
         shownItems: [],
         isGameComplete: false,
+        isFinalComparison: false,
+        hasHadFinalShowdown: false,
         currentStreak: {
           item: '',
           count: 0
@@ -138,6 +146,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         shownItems: action.initialItems,
         selectedItems: [],
         isGameComplete: false,
+        isFinalComparison: false,
+        hasHadFinalShowdown: false,
         currentStreak: {
           item: '',
           count: 0
@@ -163,7 +173,44 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         longestStreak: newLongestStreak
       })
 
+      // If we're in a final comparison, handle it and end the game
+      if (state.isFinalComparison) {
+        const finalCurrentStreak = action.item === state.currentStreak.item 
+          ? { ...state.currentStreak, count: state.currentStreak.count + 1 }
+          : { item: action.item, count: 1 }
+
+        return {
+          ...state,
+          selectedItems: [...state.selectedItems, action.item],
+          isGameComplete: true,
+          currentStreak: finalCurrentStreak,
+          // Keep the existing longest streak
+          longestStreak: state.longestStreak,
+          currentItems: [], // Clear current items to prevent further choices
+          shownItems: [...state.shownItems, action.item],
+          hasHadFinalShowdown: true,
+          isFinalComparison: false
+        }
+      }
+
+      // If there's no new item, check if we need to start a final comparison
       if (!action.newItem) {
+        const needsFinalComparison = !state.hasHadFinalShowdown && 
+          newCurrentStreak.item !== newLongestStreak.item && 
+          newLongestStreak.count > 0
+        if (needsFinalComparison) {
+          // Continue the game with the final comparison
+          return {
+            ...state,
+            selectedItems: [...state.selectedItems, action.item],
+            currentStreak: newCurrentStreak,
+            longestStreak: newLongestStreak,
+            currentItems: [newCurrentStreak.item, newLongestStreak.item],
+            shownItems: [...state.shownItems, action.item],
+            isFinalComparison: true
+          }
+        }
+        // Game is truly complete
         return {
           ...state,
           selectedItems: [...state.selectedItems, action.item],
@@ -172,6 +219,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
           longestStreak: newLongestStreak
         }
       }
+
+      // Normal case - continue the game
       return {
         ...state,
         selectedItems: [...state.selectedItems, action.item],
@@ -179,6 +228,25 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         shownItems: [...state.shownItems, action.newItem],
         currentStreak: newCurrentStreak,
         longestStreak: newLongestStreak
+      }
+    }
+    case 'START_FINAL_COMPARISON': {
+      return {
+        ...state,
+        isFinalComparison: true,
+        currentItems: [state.currentStreak.item, state.longestStreak.item]
+      }
+    }
+    case 'COMPLETE_FINAL_COMPARISON': {
+      const winner = action.winner
+      const isCurrentStreakWinner = winner === state.currentStreak.item
+      const finalStreak = isCurrentStreakWinner ? state.currentStreak : state.longestStreak
+      
+      return {
+        ...state,
+        isFinalComparison: false,
+        currentStreak: finalStreak,
+        longestStreak: finalStreak
       }
     }
     case 'PLAY_AGAIN':
@@ -189,6 +257,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         selectedItems: [],
         shownItems: newItems,
         isGameComplete: false,
+        isFinalComparison: false,
+        hasHadFinalShowdown: false,
         currentItems: newItems,
         currentStreak: {
           item: '',
@@ -208,6 +278,8 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         selectedItems: [],
         shownItems: [],
         isGameComplete: false,
+        isFinalComparison: false,
+        hasHadFinalShowdown: false,
         currentStreak: {
           item: '',
           count: 0
@@ -362,6 +434,14 @@ export function Game() {
     navigate('/')
   }
 
+  const handleStartFinalComparison = () => {
+    dispatch({ type: 'START_FINAL_COMPARISON' })
+  }
+
+  const handleFinalComparison = (winner: string) => {
+    dispatch({ type: 'COMPLETE_FINAL_COMPARISON', winner })
+  }
+
   const getQuestionText = () => {
     if (state.isGameComplete) {
       return state.selectedGame?.question
@@ -464,6 +544,16 @@ export function Game() {
                         item,
                         newItem,
                       })
+                    }}
+                    style={{
+                      backgroundColor: state.currentItems.length === 2 && 
+                        state.currentItems.includes(state.currentStreak.item) && 
+                        state.currentItems.includes(state.longestStreak.item) &&
+                        state.currentStreak.item !== '' &&
+                        state.longestStreak.item !== '' &&
+                        state.currentStreak.item !== state.longestStreak.item
+                        ? '#28a745' 
+                        : '#007bff'
                     }}
                   >
                     {item}

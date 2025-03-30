@@ -33,7 +33,7 @@ const MainContent = styled.div`
   max-width: 600px;
   margin: 0 auto;
   padding: 0 1rem;
-  margin-top: 0.5rem;
+  margin-top: 0.25rem;
 `
 
 const AchievementsContainer = styled.div`
@@ -98,7 +98,7 @@ function AppContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="bg-gray-50 min-h-screen flex flex-col">
       <NavContainer>
         <NavContent>
           <NavLink to="/" onClick={handleHomeClick}>Prolly.is</NavLink>

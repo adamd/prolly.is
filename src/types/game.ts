@@ -14,6 +14,8 @@ export type GameState = {
   selectedItems: string[]
   shownItems: string[]
   isGameComplete: boolean
+  isFinalComparison: boolean
+  hasHadFinalShowdown: boolean
   windowSize: {
     width: number
     height: number
@@ -35,4 +37,6 @@ export type GameAction =
   | { type: 'PLAY_AGAIN' }
   | { type: 'NEW_CATEGORY_GAME' }
   | { type: 'START_OVER' }
-  | { type: 'UPDATE_WINDOW_SIZE'; size: { width: number; height: number } } 
+  | { type: 'UPDATE_WINDOW_SIZE'; size: { width: number; height: number } }
+  | { type: 'START_FINAL_COMPARISON' }
+  | { type: 'COMPLETE_FINAL_COMPARISON'; winner: string } 
