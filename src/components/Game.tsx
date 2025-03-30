@@ -17,7 +17,6 @@ import {
   ConfettiContainer,
   ReloadButton
 } from '../styles/components'
-import styled from 'styled-components'
 
 const DEBUG = false // Set to true to enable logging
 
@@ -344,19 +343,6 @@ export function Game() {
 
   const handleGameSelect = (game: GameType) => {
     navigate(`/${state.selectedCategory?.toLowerCase()}/${game.label.toLowerCase().replace(/\s+/g, '-')}`)
-  }
-
-  const handleItemSelect = (item: string) => {
-    if (state.shownItems.length === state.selectedGame!.items.length - 2) {
-      dispatch({ type: 'SELECT_ITEM', item })
-      return
-    }
-    const newItem = getRandomItems(state.selectedGame!.items, 1, state.shownItems, DEBUG)[0]
-    dispatch({ 
-      type: 'SELECT_ITEM', 
-      item,
-      newItem 
-    })
   }
 
   const handlePlayAgain = () => {
