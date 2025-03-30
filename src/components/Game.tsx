@@ -198,6 +198,7 @@ export function Game() {
     if (!category) {
       // Clear localStorage when navigating to home page
       localStorage.removeItem(STORAGE_KEY)
+      dispatch({ type: 'START_OVER' })
       return
     }
 
