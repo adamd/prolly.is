@@ -417,29 +417,26 @@ export function Game() {
     navigate(`/${state.selectedCategory?.toLowerCase()}/${game.label.toLowerCase().replace(/\s+/g, '-')}`)
   }
 
+  const handleItemSelect = (item: string, newItem: string) => {
+    dispatch({ type: 'SELECT_ITEM', item, newItem })
+  }
+
   const handlePlayAgain = () => {
-    localStorage.removeItem(STORAGE_KEY)
     dispatch({ type: 'PLAY_AGAIN' })
   }
 
-  const handleNewCategoryGame = () => {
-    localStorage.removeItem(STORAGE_KEY)
+  const handleNewCategory = () => {
     dispatch({ type: 'NEW_CATEGORY_GAME' })
-    navigate(`/${state.selectedCategory?.toLowerCase()}`)
   }
 
   const handleStartOver = () => {
-    localStorage.removeItem(STORAGE_KEY)
     dispatch({ type: 'START_OVER' })
-    navigate('/')
   }
 
-  const handleStartFinalComparison = () => {
-    dispatch({ type: 'START_FINAL_COMPARISON' })
-  }
-
-  const handleFinalComparison = (winner: string) => {
-    dispatch({ type: 'COMPLETE_FINAL_COMPARISON', winner })
+  const handleReloadGames = () => {
+    if (!state.selectedCategory) return
+    const newGames = getRandomGames(state.selectedCategory, 2)
+    dispatch({ type: 'SELECT_GAME', game: newGames[0], initialItems: newGames.map(g => g.label) })
   }
 
   const getQuestionText = () => {
@@ -453,34 +450,6 @@ export function Game() {
       return `Choose a ${state.selectedCategory} option`
     }
     return "Prolly.is time to choose a category"
-  }
-
-  const handleReloadGames = () => {
-    if (!state.selectedCategory) return
-    const currentGames = state.selectedGames.map(g => g.label)
-    const allGames = gamesByCategory[state.selectedCategory]
-    const availableGames = allGames.filter(g => !currentGames.includes(g.label))
-    
-    if (availableGames.length < 2) {
-      // If we don't have enough games to exclude, just get random ones
-      const newGames = getRandomGames(state.selectedCategory, 2)
-      dispatch({
-        type: 'SELECT_CATEGORY',
-        category: state.selectedCategory,
-        selectedGames: newGames
-      })
-      return
-    }
-
-    // Get two random games from the available ones
-    const shuffled = [...availableGames].sort(() => Math.random() - 0.5)
-    const newGames = shuffled.slice(0, 2)
-    
-    dispatch({
-      type: 'SELECT_CATEGORY',
-      category: state.selectedCategory,
-      selectedGames: newGames
-    })
   }
 
   return (
@@ -519,7 +488,7 @@ export function Game() {
                 <CompletionButton onClick={handlePlayAgain}>
                   Play Again
                 </CompletionButton>
-                <CompletionButton onClick={handleNewCategoryGame}>
+                <CompletionButton onClick={handleNewCategory}>
                   New {state.selectedCategory}
                 </CompletionButton>
                 <CompletionButton onClick={handleStartOver}>
@@ -539,11 +508,7 @@ export function Game() {
                         (i) => !state.shownItems.includes(i)
                       )
                       const newItem = getRandomItems(remainingItems, 1, [], DEBUG)[0]
-                      dispatch({
-                        type: 'SELECT_ITEM',
-                        item,
-                        newItem,
-                      })
+                      handleItemSelect(item, newItem)
                     }}
                     style={{
                       backgroundColor: state.currentItems.length === 2 && 
