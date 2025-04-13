@@ -1,11 +1,23 @@
 import { Game } from '../types/game'
 import { gamesByCategory } from '../data/games'
 
-export function getRandomGames(category: string, count: number = 2): Game[] {
+export function getRandomGames(category: string, count: number = 2, exclude: Game[] = []): Game[] {
   const games = gamesByCategory[category]
   if (!games) return []
   
-  const shuffled = [...games].sort(() => Math.random() - 0.5)
+  // Filter out currently selected games
+  const availableGames = games.filter(game => 
+    !exclude.some(excludedGame => excludedGame.label === game.label)
+  )
+  
+  // If we don't have enough games after filtering, return all games
+  if (availableGames.length < count) {
+    const shuffled = [...games].sort(() => Math.random() - 0.5)
+    return shuffled.slice(0, count)
+  }
+  
+  // Otherwise, shuffle and return from available games
+  const shuffled = [...availableGames].sort(() => Math.random() - 0.5)
   return shuffled.slice(0, count)
 }
 

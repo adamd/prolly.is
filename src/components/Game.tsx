@@ -435,8 +435,12 @@ export function Game() {
 
   const handleReloadGames = () => {
     if (!state.selectedCategory) return
-    const newGames = getRandomGames(state.selectedCategory, 2)
-    dispatch({ type: 'SELECT_GAME', game: newGames[0], initialItems: newGames.map(g => g.label) })
+    const newGames = getRandomGames(state.selectedCategory, 2, state.selectedGames)
+    dispatch({ 
+      type: 'SELECT_CATEGORY', 
+      category: state.selectedCategory,
+      selectedGames: newGames
+    })
   }
 
   const getQuestionText = () => {
