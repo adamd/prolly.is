@@ -33,7 +33,7 @@ const MainContent = styled.div`
   max-width: 600px;
   margin: 0 auto;
   padding: 0 1rem;
-  margin-top: 0.25rem;
+  margin-top: 0;
 `
 
 const AchievementsContainer = styled.div`

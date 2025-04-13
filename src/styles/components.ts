@@ -4,15 +4,15 @@ export const Container = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
   background-color: #f8f9fa;
-  padding: 20px;
+  padding: 10px;
+  margin-bottom: 20px;
 `
 
 export const QuestionCard = styled.div`
   background: white;
   border-radius: 20px;
-  padding: 2rem;
+  padding: 1.5rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   max-width: 600px;
   width: 100%;
@@ -22,7 +22,7 @@ export const QuestionCard = styled.div`
 export const Question = styled.h1`
   font-size: 2rem;
   color: #333;
-  margin-bottom: 2rem;
+  margin-bottom: 1.5rem;
   font-weight: 600;
 `
 
